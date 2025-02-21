@@ -1,3 +1,3 @@
-this Shop API in Golang
+this is Shop API in Golang
 
 using gin framwork and GORM orm
