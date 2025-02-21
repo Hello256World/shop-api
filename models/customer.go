@@ -2,11 +2,9 @@ package models
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/Hello256World/shop-api/repository"
-	"github.com/Hello256World/shop-api/utils"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +24,7 @@ type Customer struct {
 	Gender     *Gender    `gorm:"column:gender"`
 	ModifiedAt *time.Time `gorm:"type:timestamp with time zone"`
 	CreatedAt  time.Time  `gorm:"type:timestamp with time zone;default:now()"`
+
 	// Relations
 	Cart   Cart    `gorm:"foreignKey:CustomerID;constraint:OnDelete:CASCADE;" json:"-"`
 	Orders []Order `gorm:"foreignKey:CustomerID" json:"-"`
@@ -46,27 +45,7 @@ func NewCustomerService(db *gorm.DB) *CustomerService {
 }
 
 func (cs *CustomerService) Create(c *Customer) error {
-	if !utils.CheckPhoneNum(c.Phone) {
-		return errors.New("شماره تلفن نامعتبر است")
-	}
-	err := cs.repo.Create(c)
-
-	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates") {
-			return errors.New("there is already a customer with this phone number")
-		}
-	}
-
-	return err
-}
-
-func (cs *CustomerService) GetCustomerByPhone(phone string) (*Customer, error) {
-	result, err := cs.GetByPhone(phone)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return cs.repo.Create(c)
 }
 
 func (cs *CustomerService) GetByPhone(phone string) (*Customer, error) {

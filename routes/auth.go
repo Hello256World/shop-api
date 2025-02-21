@@ -27,25 +27,37 @@ func NewAuthHandler(db *gorm.DB) *AuthHandler {
 }
 
 func (a *AuthHandler) signup(c *gin.Context) {
-	var customer models.Customer
+	var inputCustomer struct {
+		FullName string `form:"fullname" binding:"required"`
+		Phone    string `form:"phone" binding:"required,phone"`
+	}
 
-	err := c.ShouldBind(&customer)
-	if err != nil {
+	if err := c.ShouldBind(&inputCustomer); err != nil {
+		getErrors := utils.FormValidation(err.Error(), map[string]string{"FullName": "نام و نام خانوادگی", "Phone": "تلفن همراه"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": getErrors, "error": err.Error()})
+		return
+	}
+
+	_, err := a.customerService.GetByPhone(inputCustomer.Phone)
+
+	if err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "کاربر دیگری با این تلفن همراه وجود دارد"})
+		return
+	}
+
+	customer := models.Customer{
+		Fullname: inputCustomer.FullName,
+		Phone:    inputCustomer.Phone,
+	}
+
+	if err := a.customerService.Create(&customer); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
 
-	err = a.customerService.Create(&customer)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
-		return
-	}
-
-	err = a.cartService.Create(&models.Cart{
+	if err := a.cartService.Create(&models.Cart{
 		CustomerID: customer.ID,
-	})
-
-	if err != nil {
+	}); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
@@ -55,7 +67,7 @@ func (a *AuthHandler) signup(c *gin.Context) {
 
 func (a *AuthHandler) otp(c *gin.Context) {
 	var request struct {
-		Phone string `json:"phone" binding:"required"`
+		Phone string `json:"phone" binding:"required,phone"`
 	}
 
 	err := c.ShouldBind(&request)
@@ -71,7 +83,7 @@ func (a *AuthHandler) otp(c *gin.Context) {
 		return
 	}
 
-	customer, err := a.customerService.GetCustomerByPhone(request.Phone)
+	customer, err := a.customerService.GetByPhone(request.Phone)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
@@ -96,7 +108,7 @@ func (a *AuthHandler) otp(c *gin.Context) {
 
 func (a *AuthHandler) signin(c *gin.Context) {
 	var input struct {
-		Phone    string `json:"phone" binding:"required"`
+		Phone    string `json:"phone" binding:"required,phone"`
 		Password string `json:"password" bining:"required"`
 	}
 
@@ -114,7 +126,7 @@ func (a *AuthHandler) signin(c *gin.Context) {
 		return
 	}
 
-	customer, err := a.customerService.GetCustomerByPhone(input.Phone)
+	customer, err := a.customerService.GetByPhone(input.Phone)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
