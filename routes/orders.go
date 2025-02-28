@@ -22,7 +22,35 @@ func NewOrderHandler(db *gorm.DB) *OrderHandler {
 }
 
 func (o *OrderHandler) getAll(c *gin.Context) {
-	orders, err := o.orderService.GetAll()
+	customerName := c.Query("customerName")
+	sortBy := c.Query("sortBy")
+	order := c.Query("order")
+	take := c.Query("take")
+	skip := c.Query("skip")
+	customerId := c.Query("customerId")
+	id := c.Query("id")
+	var customerIdInt uint64
+	if customerId != "" {
+		if parsedId, err := strconv.ParseUint(customerId, 10, 64); err == nil {
+			customerIdInt = parsedId
+		}
+	}
+	var idInt uint64
+	if id != "" {
+		if parsedId, err := strconv.ParseUint(id, 10, 64); err == nil {
+			idInt = parsedId
+		}
+	}
+	takeInt, err := strconv.Atoi(take)
+	if err != nil {
+		takeInt = 10
+	}
+	skipInt, err := strconv.Atoi(skip)
+	if err != nil {
+		skipInt = 0
+	}
+
+	orders, err := o.orderService.GetAll(idInt, customerIdInt, customerName, sortBy, order, takeInt, skipInt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت سفارش ها", "error": err.Error()})
 		return
@@ -92,4 +120,29 @@ func (o *OrderHandler) update(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "سفارش با موفقیت بروزرسانی شد"})
+}
+
+func (o *OrderHandler) getByCustomer(c *gin.Context) {
+	customerName := c.Query("customerName")
+	sortBy := c.Query("sortBy")
+	order := c.Query("order")
+	take := c.Query("take")
+	skip := c.Query("skip")
+	takeInt, err := strconv.Atoi(take)
+	if err != nil {
+		takeInt = 10
+	}
+	skipInt, err := strconv.Atoi(skip)
+	if err != nil {
+		skipInt = 0
+	}
+
+	orders, err := o.orderService.GetByCustomerId(c.GetUint64("customerId"), customerName, sortBy, order, takeInt, skipInt)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت سفارش ها", "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"orders": orders})
 }

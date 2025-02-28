@@ -30,6 +30,13 @@ func (ch *CategoryHandler) getAll(c *gin.Context) {
 	order := c.Query("order")
 	take := c.Query("take")
 	skip := c.Query("skip")
+	id := c.Query("id")
+	var idInt uint64
+	if id != ""{
+		if parsedId,err := strconv.ParseUint(id,10,64);err == nil{
+			idInt = uint64(parsedId)
+		}
+	}
 	takeInt, err := strconv.Atoi(take)
 	if err != nil {
 		takeInt = 10
@@ -39,7 +46,7 @@ func (ch *CategoryHandler) getAll(c *gin.Context) {
 		skipInt = 0
 	}
 
-	categories, err := ch.categoryService.GetAll(name, sortBy, order, takeInt, skipInt)
+	categories, err := ch.categoryService.GetAll(name, sortBy, order,idInt, takeInt, skipInt)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
@@ -55,6 +62,13 @@ func (ch *CategoryHandler) getAllActive(c *gin.Context) {
 	order := c.Query("order")
 	take := c.Query("take")
 	skip := c.Query("skip")
+	id := c.Query("id")
+	var idInt uint64
+	if id != ""{
+		if parsedId,err := strconv.ParseUint(id,10,64);err == nil{
+			idInt = uint64(parsedId)
+		}
+	}
 	takeInt, err := strconv.Atoi(take)
 	if err != nil {
 		takeInt = 10
@@ -64,7 +78,7 @@ func (ch *CategoryHandler) getAllActive(c *gin.Context) {
 		skipInt = 0
 	}
 
-	categories, err := ch.categoryService.GetAllActive(name, sortBy, order, takeInt, skipInt)
+	categories, err := ch.categoryService.GetAllActive(name, sortBy, order,idInt, takeInt, skipInt)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت دسته بندی"})

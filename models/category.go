@@ -17,6 +17,7 @@ type Category struct {
 	IsDelete   *bool `gorm:"default:false"`
 	ModifiedAt *time.Time
 	CreateAt   time.Time `gorm:"not null;default:now()"`
+
 	// Relations
 	SubCategories []Category `gorm:"foreignKey:ParentID" json:"-"`
 	Products      []Product  `gorm:"foreignKey:CategoryID" json:"-"`
@@ -36,43 +37,51 @@ func NewCategoryService(db *gorm.DB) *CategoryService {
 	}
 }
 
-func (c *CategoryService) GetAll(name, sortBy, order string, take, skip int) (*[]Category, error) {
+func (c *CategoryService) GetAll(name, sortBy, order string, id uint64, take, skip int) (*[]Category, error) {
 	var categories []Category
 	query := c.repo.GetQuery()
 
-	if name != "" {
-		query = query.Where("name LIKE ?", "%"+name+"%")
-	}
-	if sortBy != "" {
-		if order == "desc" {
-			query = query.Order(sortBy + " desc")
-		} else {
-			query = query.Order(sortBy + " asc")
+	if id > 0 {
+		query = query.Where("id = ?", id).Limit(1).Find(&categories)
+	} else {
+		if name != "" {
+			query = query.Where("name LIKE ?", "%"+name+"%")
 		}
-	}
+		if sortBy != "" {
+			if order == "desc" {
+				query = query.Order(sortBy + " desc")
+			} else {
+				query = query.Order(sortBy + " asc")
+			}
+		}
 
-	query = query.Offset(skip).Limit(take).Find(&categories)
+		query = query.Offset(skip).Limit(take).Find(&categories)
+	}
 
 	return &categories, query.Error
 }
 
-func (c *CategoryService) GetAllActive(name, sortBy, order string, take, skip int) (*[]Category, error) {
+func (c *CategoryService) GetAllActive(name, sortBy, order string,id uint64, take, skip int) (*[]Category, error) {
 	var categories []Category
 
 	query := c.repo.GetQuery().Where("is_active = ? AND is_delete = ?", true, false)
 
-	if name != "" {
-		query = query.Where("name LIKE ?", "%"+name+"%")
-	}
-	if sortBy != "" {
-		if order == "desc" {
-			query = query.Order(sortBy + " desc")
-		} else {
-			query = query.Order(sortBy + " asc")
+	if id > 0 {
+		query = query.Where("id = ?", id).Limit(1).Find(&categories)
+	}else {
+		if name != "" {
+			query = query.Where("name LIKE ?", "%"+name+"%")
 		}
+		if sortBy != "" {
+			if order == "desc" {
+				query = query.Order(sortBy + " desc")
+			} else {
+				query = query.Order(sortBy + " asc")
+			}
+		}
+	
+		query = query.Offset(skip).Limit(take).Find(&categories)
 	}
-
-	query = query.Offset(skip).Limit(take).Find(&categories)
 
 	return &categories, query.Error
 }

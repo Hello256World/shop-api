@@ -8,12 +8,14 @@ import (
 
 func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	authHandler := NewAuthHandler(db)
+	cartHandler := NewCartHandler(db)
 	usersHandler := NewUserHandler(db)
 	orderHandler := NewOrderHandler(db)
 	adminHandler := NewAdminHandler(db)
 	productHandler := NewProductHandler(db)
 	categoryHandler := NewCategoryHandler(db)
 	superAdminHandler := NewSuperAdminHandler(db)
+	cartProductHandler := NewCartProductHandler(db)
 	imageProductHandler := NewImageProductHandler(db)
 	specificationHandler := NewSpecificationHandler(db)
 	compareProductHandler := NewCompareProductHandler(db)
@@ -27,8 +29,16 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	publicGroup.POST("/otp", authHandler.otp)
 	publicGroup.POST("/signin", authHandler.signin)
 	publicGroup.GET("/customers", usersHandler.getMe)
-	publicGroup.GET("/categories",categoryHandler.getAllActive)
-	publicGroup.GET("/products",productHandler.getAllActive)
+	publicGroup.GET("/categories", categoryHandler.getAllActive)
+	publicGroup.GET("/products", productHandler.getAllActive)
+
+	restrictedGroup := mainGroup.Group("/restricted")
+	restrictedGroup.Use(middleware.CustomerAccess)
+	restrictedGroup.GET("/carts", cartHandler.getAll)
+	restrictedGroup.DELETE("/carts/:cartId", cartProductHandler.deleteAll)
+	restrictedGroup.POST("/cart-products", cartProductHandler.create)                 
+	restrictedGroup.DELETE("/cart-products/:cartProductId", cartProductHandler.delete) 
+	restrictedGroup.GET("/orders", orderHandler.getByCustomer)                       
 
 	/// Super Admin
 	superAdminGroup := mainGroup.Group("/limited/")
@@ -57,7 +67,7 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	adminGroup.DELETE("products/:productId/specifications/:id", specificationHandler.delete)
 
 	/// Orders
-	adminGroup.GET("orders", orderHandler.getAll)
+	adminGroup.GET("orders", orderHandler.getAll) 
 	adminGroup.PUT("orders/:id", orderHandler.update)
 
 	/// Compare Products

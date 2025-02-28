@@ -44,57 +44,68 @@ func NewProductService(db *gorm.DB) *ProductService {
 	}
 }
 
-func (p *ProductService) GetAll(catId uint64, minPrice, maxPrice float64, name, sortBy, order string, take, skip int) (*[]Product, error) {
+func (p *ProductService) GetAll(catId, productId uint64, minPrice, maxPrice float64, name, sortBy, order string, take, skip int) (*[]Product, error) {
 	var products []Product
 	query := p.repo.GetQuery().Where("category_id = ?", catId)
 
-	if name != "" {
-		query = query.Where("name LIKE ?", "%"+name+"%")
-	}
-	if minPrice > 0 {
-		query = query.Where("price >= ?", minPrice)
-	}
-	if maxPrice > 0 {
-		query = query.Where("price <= ?", maxPrice)
-	}
-
-	if sortBy != "" {
-		if order == "desc" {
-			query = query.Order(sortBy + " desc")
-		} else {
-			query = query.Order(sortBy + " asc")
+	if productId > 0 {
+		query = query.Where("id = ?", productId).Limit(1).Find(&products)
+	} else {
+		if name != "" {
+			query = query.Where("name LIKE ?", "%"+name+"%")
 		}
-	}
+		if minPrice > 0 {
+			query = query.Where("price >= ?", minPrice)
+		}
+		if maxPrice > 0 {
+			query = query.Where("price <= ?", maxPrice)
+		}
 
-	query = query.Offset(skip).Limit(take).Find(&products)
+		if sortBy != "" {
+			if order == "desc" {
+				query = query.Order(sortBy + " desc")
+			} else {
+				query = query.Order(sortBy + " asc")
+			}
+		}
+
+		query = query.Offset(skip).Limit(take).Find(&products)
+	}
 
 	return &products, query.Error
 }
 
-func (p *ProductService) GetAllActive(minPrice, maxPrice float64, name, sortBy, order string, take, skip int) (*[]Product, error) {
+func (p *ProductService) GetAllActive(productId, categoryId uint64, minPrice, maxPrice float64, name, sortBy, order string, take, skip int) (*[]Product, error) {
 	var products []Product
 	query := p.repo.GetQuery().
 		Joins("JOIN category ON category.id = product.category_id").
 		Where("product.is_active = ? AND product.is_delete = ? AND category.is_active = ? AND category.is_delete = ?", true, false, true, false)
 
-	if name != "" {
-		query = query.Where("product.name LIKE ?", "%"+name+"%")
-	}
-	if minPrice > 0 {
-		query = query.Where("product.price >= ?", minPrice)
-	}
-	if maxPrice > 0 {
-		query = query.Where("product.price <= ?", maxPrice)
-	}
-
-	if sortBy != "" {
-		if order == "desc" {
-			query = query.Order("product."+sortBy + " desc")
-		} else {
-			query = query.Order("product."+sortBy + " asc")
+	if productId > 0 {
+		query = query.Where("product.id = ?", productId).Limit(1).Find(&products)
+	} else {
+		if categoryId > 0 {
+			query = query.Where("product.category_id = ?", categoryId)
 		}
+		if name != "" {
+			query = query.Where("product.name LIKE ?", "%"+name+"%")
+		}
+		if minPrice > 0 {
+			query = query.Where("product.price >= ?", minPrice)
+		}
+		if maxPrice > 0 {
+			query = query.Where("product.price <= ?", maxPrice)
+		}
+
+		if sortBy != "" {
+			if order == "desc" {
+				query = query.Order("product." + sortBy + " desc")
+			} else {
+				query = query.Order("product." + sortBy + " asc")
+			}
+		}
+		query = query.Offset(skip).Limit(take).Find(&products)
 	}
-	query = query.Offset(skip).Limit(take).Find(&products)
 
 	return &products, query.Error
 }

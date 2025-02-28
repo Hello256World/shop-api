@@ -39,6 +39,13 @@ func (p *ProductHandler) getAll(c *gin.Context) {
 	order := c.Query("order")
 	take := c.Query("take")
 	skip := c.Query("skip")
+	productId := c.Query("productId")
+	var productIdUint uint64
+	if productId != "" {
+		if parseId, err := strconv.ParseUint(productId, 10, 64); err == nil {
+			productIdUint = parseId
+		}
+	}
 
 	takeInt, err := strconv.Atoi(take)
 	if err != nil {
@@ -62,7 +69,7 @@ func (p *ProductHandler) getAll(c *gin.Context) {
 		}
 	}
 
-	products, err := p.productService.GetAll(id, minPrice, maxPrice, name, sortBy, order, takeInt, skipInt)
+	products, err := p.productService.GetAll(id, productIdUint, minPrice, maxPrice, name, sortBy, order, takeInt, skipInt)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -80,7 +87,20 @@ func (p *ProductHandler) getAllActive(c *gin.Context) {
 	order := c.Query("order")
 	take := c.Query("take")
 	skip := c.Query("skip")
-
+	productId := c.Query("productId")
+	var productIdUint uint64
+	if productId != "" {
+		if parseId, err := strconv.ParseUint(productId, 10, 64); err == nil {
+			productIdUint = parseId
+		}
+	}
+	categoryId := c.Query("categoryId")
+	var categoryIdUint uint64
+	if categoryId != "" {
+		if parseId, err := strconv.ParseUint(categoryId, 10, 64); err == nil {
+			categoryIdUint = parseId
+		}
+	}
 	takeInt, err := strconv.Atoi(take)
 	if err != nil {
 		takeInt = 10
@@ -103,7 +123,7 @@ func (p *ProductHandler) getAllActive(c *gin.Context) {
 		}
 	}
 
-	products, err := p.productService.GetAllActive(minPrice, maxPrice, name, sortBy, order, takeInt, skipInt)
+	products, err := p.productService.GetAllActive(productIdUint, categoryIdUint, minPrice, maxPrice, name, sortBy, order, takeInt, skipInt)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت محصولات", "error": err.Error()})
