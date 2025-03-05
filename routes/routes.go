@@ -12,6 +12,7 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	usersHandler := NewUserHandler(db)
 	orderHandler := NewOrderHandler(db)
 	adminHandler := NewAdminHandler(db)
+	addressHandler := NewAddressHandler(db)
 	productHandler := NewProductHandler(db)
 	categoryHandler := NewCategoryHandler(db)
 	superAdminHandler := NewSuperAdminHandler(db)
@@ -34,11 +35,25 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 
 	restrictedGroup := mainGroup.Group("/restricted")
 	restrictedGroup.Use(middleware.CustomerAccess)
+
+	// Restericted : Carts
 	restrictedGroup.GET("/carts", cartHandler.getAll)
 	restrictedGroup.DELETE("/carts/:cartId", cartProductHandler.deleteAll)
+
+	// Restericted : Cart Products
 	restrictedGroup.POST("/cart-products", cartProductHandler.create)                 
 	restrictedGroup.DELETE("/cart-products/:cartProductId", cartProductHandler.delete) 
-	restrictedGroup.GET("/orders", orderHandler.getByCustomer)                       
+
+	// Restericted : Orders
+	restrictedGroup.GET("/orders", orderHandler.getByCustomer)                  
+	restrictedGroup.POST("/orders", orderHandler.create)  
+	
+	// Restericted : Addresses
+	restrictedGroup.GET("/addresses",addressHandler.getAllActive)
+	restrictedGroup.POST("/addresses",addressHandler.create)
+	restrictedGroup.PUT("/addresses/:id",addressHandler.update)
+	restrictedGroup.DELETE("/addresses/:id",addressHandler.delete)
+	
 
 	/// Super Admin
 	superAdminGroup := mainGroup.Group("/limited/")

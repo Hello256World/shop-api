@@ -12,9 +12,10 @@ import (
 type OrderStatus string
 
 const (
-	StatusConfirmed OrderStatus = "confirmed"
-	StatusWaiting   OrderStatus = "waiting"
-	StatusRejected  OrderStatus = "rejected"
+	StatusConfirmed     OrderStatus = "confirmed"
+	StatusWaitingForIPG OrderStatus = "waiting_for_ipg"
+	StatusRejected      OrderStatus = "rejected"
+	StatusNew           OrderStatus = "new"
 )
 
 func (s *OrderStatus) Scan(value interface{}) error {
@@ -41,6 +42,7 @@ func (s OrderStatus) Value() (driver.Value, error) {
 type Order struct {
 	ID              uint64 `gorm:"primaryKey"`
 	CustomerID      uint64 `gorm:"not null"`
+	AddressID       uint64 `gorm:"not null"`
 	CustomerName    string `gorm:"not null"`
 	Phone           string `gorm:"not null"`
 	Description     *string
@@ -125,4 +127,12 @@ func (o *OrderService) GetByCustomerId(customerId uint64, customerName, sortBy, 
 	query = query.Offset(skip).Limit(take).Preload("OrderProducts").Find(&orders)
 
 	return &orders, query.Error
+}
+
+func (o *OrderService) Create(entity *Order) error {
+	return o.repo.Create(entity)
+}
+
+func (o *OrderService) BeginTransaction() *gorm.DB {
+	return o.repo.GetQuery().Begin()
 }

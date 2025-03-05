@@ -12,12 +12,22 @@ import (
 )
 
 type OrderHandler struct {
-	orderService *models.OrderService
+	orderService        *models.OrderService
+	addressService      *models.AddressService
+	cartService         *models.CartService
+	productService      *models.ProductService
+	orderProductService *models.OrderProductService
+	cartProductService  *models.CartProductService
 }
 
 func NewOrderHandler(db *gorm.DB) *OrderHandler {
 	return &OrderHandler{
-		orderService: models.NewOrderService(db),
+		orderService:        models.NewOrderService(db),
+		addressService:      models.NewAddressService(db),
+		cartService:         models.NewCartService(db),
+		productService:      models.NewProductService(db),
+		orderProductService: models.NewOrderProductService(db),
+		cartProductService:  models.NewCartProductService(db),
 	}
 }
 
@@ -145,4 +155,120 @@ func (o *OrderHandler) getByCustomer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{"orders": orders})
+}
+
+func (o *OrderHandler) create(c *gin.Context) {
+	customerId := c.GetUint64("customerId")
+	var inputOrder struct {
+		AddressID   uint64  `form:"address_id" binding:"required"`
+		Description *string `form:"description"`
+	}
+
+	if err := c.ShouldBind(&inputOrder); err != nil {
+		getErrors := utils.FormValidation(err.Error(), map[string]string{"AddressID": "شناسه آدرس", "Description": "توضیحات"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": getErrors, "error": err.Error()})
+		return
+	}
+
+	address, err := o.addressService.GetById(inputOrder.AddressID)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت آدرس کاربر", "error": err.Error()})
+		return
+	}
+
+	if address.CustomerID != customerId {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت آدرس کاربر"})
+		return
+	}
+
+	cart, err := o.cartService.GetByCustomerId(customerId)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت محصولات سبد خرید"})
+		return
+	} else if len(cart.CartProducts) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "سبد خرید شما خالی می باشد"})
+		return
+	}
+
+	var productsId []uint64
+	var productsMap = make(map[int]int)
+
+	for _, val := range cart.CartProducts {
+		productsMap[int(val.ProductID)] = val.Quantity
+		productsId = append(productsId, val.ProductID)
+	}
+
+	var weight float64
+	var totalAmount float64
+
+	products, err := o.productService.GetProductsById(productsId...)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت محصولات سبد خرید"})
+		return
+	}
+
+	for _, val := range *products {
+		weight += val.ShipmentWeight * float64(productsMap[int(val.ID)])
+		totalAmount += val.Price
+	}
+
+	customerOrder := models.Order{
+		AddressID:       address.ID,
+		CustomerID:      customerId,
+		CustomerName:    address.ReceiverName,
+		Phone:           address.Phone,
+		Description:     inputOrder.Description,
+		DeliverMethod:   "post",
+		DeliveryAddress: address.Address,
+		Status:          models.StatusWaitingForIPG,
+		Weight:          weight,
+		TotalAmount:     totalAmount,
+	}
+
+	tx := o.orderService.BeginTransaction()
+	defer tx.Rollback()
+
+	if err := tx.Create(&customerOrder).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت سفارش"})
+		return
+	}
+
+	var orderProducts []models.OrderProduct
+
+	for _, val := range cart.CartProducts {
+		var price float64
+		for _, value := range *products {
+			if value.ID == val.ProductID {
+				price = value.Price
+			}
+		}
+		orderProduct := models.OrderProduct{
+			OrderID:   customerOrder.ID,
+			Quantity:  val.Quantity,
+			ProductID: val.ProductID,
+			Price:     price,
+		}
+
+		orderProducts = append(orderProducts, orderProduct)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت سفارش"})
+		return
+	}
+
+	if err := o.orderProductService.CreateRange(orderProducts...); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت سفارش محصولات"})
+		return
+	}
+
+	if err := o.cartProductService.DeleteAll(cart.ID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در حذف کردن محصولات سبد خرید"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "سفارش با موفقیت ثبت شد", "URL": "https://hello.com"})
 }

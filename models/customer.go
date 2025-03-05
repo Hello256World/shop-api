@@ -26,8 +26,9 @@ type Customer struct {
 	CreatedAt  time.Time  `gorm:"type:timestamp with time zone;default:now()"`
 
 	// Relations
-	Cart   Cart    `gorm:"foreignKey:CustomerID;constraint:OnDelete:CASCADE;" json:"-"`
-	Orders []Order `gorm:"foreignKey:CustomerID" json:"-"`
+	Cart      Cart      `gorm:"foreignKey:CustomerID;constraint:OnDelete:CASCADE;" json:"-"`
+	Orders    []Order   `gorm:"foreignKey:CustomerID" json:"-"`
+	Addresses []Address `gorm:"foreignKey:CustomerID" json:"-"`
 }
 
 func (Customer) TableName() string {

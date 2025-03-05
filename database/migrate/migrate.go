@@ -9,7 +9,7 @@ import (
 )
 
 func Init() {
-	if err := database.DB.Exec("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN CREATE TYPE order_status AS ENUM ('confirmed', 'waiting', 'rejected'); END IF; END $$;").Error; err != nil {
+	if err := database.DB.Exec("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN CREATE TYPE order_status AS ENUM ('confirmed', 'waiting_for_ipg', 'rejected','new'); END IF; END $$;").Error; err != nil {
 		fmt.Println("Failed to create enum type:", err)
 		return
 	}

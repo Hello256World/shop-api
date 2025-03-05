@@ -146,11 +146,12 @@ func (p *ProductHandler) create(c *gin.Context) {
 	}
 
 	var inputProduct struct {
-		Name        string                `json:"name" form:"name" binding:"required"`
-		Price       float64               `json:"price" form:"price" binding:"required"`
-		Stock       int                   `json:"stock" form:"stock" binding:"required"`
-		Description *string               `json:"description" form:"description"`
-		File        *multipart.FileHeader `json:"file" form:"file" binding:"required"`
+		Name           string                `json:"name" form:"name" binding:"required"`
+		Price          float64               `json:"price" form:"price" binding:"required"`
+		Stock          int                   `json:"stock" form:"stock" binding:"required"`
+		ShipmentWeight *float64              `json:"shipment_weight" form:"shipment_weight" binding:"required,gt=0"`
+		Description    *string               `json:"description" form:"description"`
+		File           *multipart.FileHeader `json:"file" form:"file" binding:"required"`
 	}
 
 	if err := c.ShouldBind(&inputProduct); err != nil {
@@ -166,12 +167,13 @@ func (p *ProductHandler) create(c *gin.Context) {
 	}
 
 	product := models.Product{
-		Description: inputProduct.Description,
-		Name:        inputProduct.Name,
-		Price:       inputProduct.Price,
-		Stock:       inputProduct.Stock,
-		Thumbnail:   *imageLocation,
-		CategoryID:  id,
+		Description:    inputProduct.Description,
+		Name:           inputProduct.Name,
+		Price:          inputProduct.Price,
+		Stock:          inputProduct.Stock,
+		Thumbnail:      *imageLocation,
+		ShipmentWeight: *inputProduct.ShipmentWeight,
+		CategoryID:     id,
 	}
 
 	if err = p.productService.Create(product); err != nil {
@@ -212,12 +214,13 @@ func (p *ProductHandler) update(c *gin.Context) {
 	}
 
 	var inputProduct struct {
-		Name        string                `json:"name" form:"name" binding:"required"`
-		Description *string               `json:"description" form:"description"`
-		Price       float64               `json:"price" form:"price" binding:"required"`
-		Stock       *int                  `json:"stock" form:"stock" binding:"required"`
-		Thumbnail   *multipart.FileHeader `json:"file" form:"file"`
-		IsActive    *bool                 `json:"is_active" form:"is_active"`
+		Name           string                `json:"name" form:"name" binding:"required"`
+		Description    *string               `json:"description" form:"description"`
+		Price          float64               `json:"price" form:"price" binding:"required"`
+		Stock          *int                  `json:"stock" form:"stock" binding:"required"`
+		ShipmentWeight *float64              `json:"shipment_weight" form:"shipment_weight" binding:"required,gt=0"`
+		Thumbnail      *multipart.FileHeader `json:"file" form:"file"`
+		IsActive       *bool                 `json:"is_active" form:"is_active"`
 	}
 
 	if err := c.ShouldBind(&inputProduct); err != nil {
@@ -247,6 +250,7 @@ func (p *ProductHandler) update(c *gin.Context) {
 	product.Description = inputProduct.Description
 	product.Price = inputProduct.Price
 	product.Stock = *inputProduct.Stock
+	product.ShipmentWeight = *inputProduct.ShipmentWeight
 	product.ModifiedAt = &now
 	if inputProduct.IsActive != nil {
 		product.IsActive = inputProduct.IsActive

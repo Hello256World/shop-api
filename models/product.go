@@ -8,17 +8,18 @@ import (
 )
 
 type Product struct {
-	ID          uint64     `gorm:"primaryKey"`
-	Name        string     `gorm:"not null"`
-	Description *string    `gorm:"column:description"`
-	Price       float64    `gorm:"not null;type:float"`
-	Stock       int        `gorm:"not null;type:int"`
-	Thumbnail   string     `gorm:"not null;type:varchar"`
-	CategoryID  uint64     `gorm:"not null;column:category_id"`
-	IsActive    *bool      `gorm:"default:true"`
-	IsDelete    *bool      `gorm:"default:false"`
-	ModifiedAt  *time.Time `gorm:"type:timestamp with time zone"`
-	CreatedAt   time.Time  `gorm:"type:timestamp with time zone;default:now()"`
+	ID             uint64     `gorm:"primaryKey"`
+	Name           string     `gorm:"not null"`
+	Description    *string    `gorm:"column:description"`
+	Price          float64    `gorm:"not null;type:float"`
+	Stock          int        `gorm:"not null;type:int"`
+	Thumbnail      string     `gorm:"not null;type:varchar"`
+	CategoryID     uint64     `gorm:"not null;column:category_id"`
+	ShipmentWeight float64    `gorm:"not null"`
+	IsActive       *bool      `gorm:"default:true"`
+	IsDelete       *bool      `gorm:"default:false"`
+	ModifiedAt     *time.Time `gorm:"type:timestamp with time zone"`
+	CreatedAt      time.Time  `gorm:"type:timestamp with time zone;default:now()"`
 
 	// Relations
 	CartProducts    []CartProduct    `gorm:"foreignKey:ProductID" json:"-"`
@@ -132,4 +133,10 @@ func (p *ProductService) Delete(id uint64) error {
 func (p *ProductService) IsProductById(id uint64) bool {
 	_, err := p.repo.GetByID(id)
 	return err == nil
+}
+
+func (p *ProductService) GetProductsById(ids ...uint64) (*[]Product,error){
+	var products []Product
+	err := p.repo.GetQuery().Where("id IN ?",ids).Find(&products).Error
+	return &products,err
 }

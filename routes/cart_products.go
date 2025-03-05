@@ -86,8 +86,20 @@ func (ch *CartProductHandler) create(c *gin.Context) {
 		return
 	}
 
-	if !ch.productService.IsProductById(inputCartProduct.ProductID) {
-		c.JSON(http.StatusNotFound, gin.H{"message": "محصولی با این شناسه یافت نشد"})
+	product, err := ch.productService.GetById(inputCartProduct.ProductID)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	if !*product.IsActive || *product.IsDelete {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "محصول نامعتبر است"})
+		return
+	}
+
+	if product.Stock < *inputCartProduct.Quantity {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "درخواست تعداد محصول بیشتر از موجودی می باشد"})
 		return
 	}
 

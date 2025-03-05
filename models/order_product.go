@@ -1,6 +1,11 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/Hello256World/shop-api/repository"
+	"gorm.io/gorm"
+)
 
 type OrderProduct struct {
 	ID         uint64     `gorm:"primaryKey"`
@@ -14,4 +19,18 @@ type OrderProduct struct {
 
 func (OrderProduct) TableName() string {
 	return "order_product"
+}
+
+type OrderProductService struct{
+	repo repository.Repository[OrderProduct]
+}
+
+func NewOrderProductService(db *gorm.DB) *OrderProductService{
+	return &OrderProductService{
+		repo: repository.NewGenericRepository[OrderProduct](db),
+	}
+}
+
+func (o *OrderProductService) CreateRange(orderProducts ...OrderProduct) error {
+	return o.repo.GetQuery().Create(orderProducts).Error
 }
