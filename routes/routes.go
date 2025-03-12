@@ -41,19 +41,19 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	restrictedGroup.DELETE("/carts/:cartId", cartProductHandler.deleteAll)
 
 	// Restericted : Cart Products
-	restrictedGroup.POST("/cart-products", cartProductHandler.create)                 
-	restrictedGroup.DELETE("/cart-products/:cartProductId", cartProductHandler.delete) 
+	restrictedGroup.POST("/cart-products", cartProductHandler.create)
+	restrictedGroup.DELETE("/cart-products/:cartProductId", cartProductHandler.delete)
 
 	// Restericted : Orders
-	restrictedGroup.GET("/orders", orderHandler.getByCustomer)                  
-	restrictedGroup.POST("/orders", orderHandler.create)  
-	
+	restrictedGroup.GET("/orders", orderHandler.getByCustomer)
+	restrictedGroup.POST("/orders", orderHandler.create)
+	restrictedGroup.PUT("/orders/:id", orderHandler.customerUpdate)
+
 	// Restericted : Addresses
-	restrictedGroup.GET("/addresses",addressHandler.getAllActive)
-	restrictedGroup.POST("/addresses",addressHandler.create)
-	restrictedGroup.PUT("/addresses/:id",addressHandler.update)
-	restrictedGroup.DELETE("/addresses/:id",addressHandler.delete)
-	
+	restrictedGroup.GET("/addresses", addressHandler.getAllActive)
+	restrictedGroup.POST("/addresses", addressHandler.create)
+	restrictedGroup.PUT("/addresses/:id", addressHandler.update)
+	restrictedGroup.DELETE("/addresses/:id", addressHandler.delete)
 
 	/// Super Admin
 	superAdminGroup := mainGroup.Group("/limited/")
@@ -82,7 +82,7 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	adminGroup.DELETE("products/:productId/specifications/:id", specificationHandler.delete)
 
 	/// Orders
-	adminGroup.GET("orders", orderHandler.getAll) 
+	adminGroup.GET("orders", orderHandler.getAll)
 	adminGroup.PUT("orders/:id", orderHandler.update)
 
 	/// Compare Products

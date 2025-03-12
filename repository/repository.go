@@ -12,6 +12,7 @@ type Repository[T any] interface {
 	GetAll() (*[]T, error)
 	GetByID(id uint64) (*T, error)
 	Update(entity *T) error
+	UpdateFields(entity *T) error
 	Delete(id uint64) error
 }
 
@@ -48,6 +49,10 @@ func (r *GenericRepository[T]) GetByID(id uint64) (*T, error) {
 
 func (r *GenericRepository[T]) Update(entity *T) error {
 	return r.db.Save(entity).Error
+}
+
+func (r *GenericRepository[T]) UpdateFields(entity *T) error {
+	return r.db.Updates(entity).Error
 }
 
 func (r *GenericRepository[T]) Delete(id uint64) error {

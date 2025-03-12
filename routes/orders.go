@@ -133,6 +133,21 @@ func (o *OrderHandler) update(c *gin.Context) {
 }
 
 func (o *OrderHandler) getByCustomer(c *gin.Context) {
+	id := c.Query("id")
+	var idUint uint64
+	if id != "" {
+		newId, err := strconv.ParseUint(id, 10, 64)
+		if err == nil {
+			idUint = newId
+		}
+	}
+	status := c.Query("status")
+	var finalstate models.OrderStatus 
+	if status != "" {
+		finalstate = models.OrderStatus(status)
+	}
+	start := c.Query("start")
+	end := c.Query("end")
 	customerName := c.Query("customerName")
 	sortBy := c.Query("sortBy")
 	order := c.Query("order")
@@ -147,7 +162,7 @@ func (o *OrderHandler) getByCustomer(c *gin.Context) {
 		skipInt = 0
 	}
 
-	orders, err := o.orderService.GetByCustomerId(c.GetUint64("customerId"), customerName, sortBy, order, takeInt, skipInt)
+	orders, err := o.orderService.GetByCustomerId(idUint, c.GetUint64("customerId"), start, end, customerName, sortBy, order, finalstate, takeInt, skipInt)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت سفارش ها", "error": err.Error()})
@@ -271,4 +286,26 @@ func (o *OrderHandler) create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "سفارش با موفقیت ثبت شد", "URL": "https://hello.com"})
+}
+
+func (o *OrderHandler) customerUpdate(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در شناسه سفارش"})
+		return
+	}
+
+	order, err := o.orderService.GetById(id)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+		return
+	}
+
+	if order.CustomerID != c.GetUint64("customerId") {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "عملیات نا معتبر است"})
+		return
+	}
+
 }

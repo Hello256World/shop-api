@@ -39,6 +39,15 @@ func (s OrderStatus) Value() (driver.Value, error) {
 	return string(s), nil
 }
 
+func (s OrderStatus) isValid() bool {
+	switch s {
+	case StatusConfirmed, StatusWaitingForIPG, StatusRejected, StatusNew:
+		return true
+	default:
+		return false
+	}
+}
+
 type Order struct {
 	ID              uint64 `gorm:"primaryKey"`
 	CustomerID      uint64 `gorm:"not null"`
@@ -109,22 +118,41 @@ func (o *OrderService) Update(order *Order) error {
 	return o.repo.Update(order)
 }
 
-func (o *OrderService) GetByCustomerId(customerId uint64, customerName, sortBy, order string, take, skip int) (*[]Order, error) {
+func (o *OrderService) GetByCustomerId(id, customerId uint64, start, end, customerName, sortBy, order string, status OrderStatus, take, skip int) (*[]Order, error) {
 	var orders []Order
 	query := o.repo.GetQuery().Where("customer_id = ?", customerId)
 
-	if customerName != "" {
-		query = query.Where("customer_name LIKE ?", "%"+customerName+"%")
-	}
-	if sortBy != "" {
-		if order == "desc" {
-			query = query.Order(sortBy + " desc")
-		} else {
-			query = query.Order(sortBy + " asc")
+	if id > 0 {
+		query = query.Where("id = ?", id).Limit(1).Preload("OrderProducts").Find(&orders)
+	} else {
+		if customerName != "" {
+			query = query.Where("customer_name LIKE ?", "%"+customerName+"%")
 		}
-	}
+		if start != "" {
+			startTime, err := time.Parse(time.RFC3339, start)
+			if err == nil {
+				query = query.Where("created_at >= ?", startTime)
+			}
+		}
+		if end != "" {
+			endTime, err := time.Parse(time.RFC3339, end)
+			if err == nil {
+				query = query.Where("created_at <= ?", endTime)
+			}
+		}
+		if status.isValid() {
+			query = query.Where("status = ?", status)
+		}
+		if sortBy != "" {
+			if order == "desc" {
+				query = query.Order(sortBy + " desc")
+			} else {
+				query = query.Order(sortBy + " asc")
+			}
+		}
 
-	query = query.Offset(skip).Limit(take).Preload("OrderProducts").Find(&orders)
+		query = query.Offset(skip).Limit(take).Preload("OrderProducts").Find(&orders)
+	}
 
 	return &orders, query.Error
 }

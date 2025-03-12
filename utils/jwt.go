@@ -2,12 +2,13 @@ package utils
 
 import (
 	"errors"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var secretKey string = "superDooperKey"
+var secretKey string = os.Getenv("JWT_SECRET_KEY")
 
 func CreateToken(role string, id uint64) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

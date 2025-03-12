@@ -19,13 +19,22 @@ import (
 )
 
 const (
-	maxPartSize        = int64(400 * 1024 * 1024)
-	maxRetries         = 3
-	awsAccessKeyID     = "3c5421dc-a54f-4788-9164-6816a2e2d323"
-	awsSecretAccessKey = "3d04700e754d2376902e02f27b8f2b6e78eef33c4f0cbca971feb416ec682133"
-	awsBucketRegion    = "default"
-	awsBucketEndpoint  = "s3.ir-thr-at1.arvanstorage.ir"
+	maxPartSize     = int64(400 * 1024 * 1024)
+	maxRetries      = 3
+	awsBucketRegion = "default"
 )
+
+var (
+	awsAccessKeyID     string
+	awsSecretAccessKey string
+	awsBucketEndpoint  string
+)
+
+func init() {
+	awsAccessKeyID = os.Getenv("AWS_ACCESS_KEY_ID")
+	awsSecretAccessKey = os.Getenv("AWS_SECRET_ACCESS_KEY")
+	awsBucketEndpoint = os.Getenv("AWS_BUCKET_ENDPOINT")
+}
 
 func uploadToArvan(bucketName string, folder string, imagePath string) *string {
 	creds := credentials.NewStaticCredentials(awsAccessKeyID, awsSecretAccessKey, "")
