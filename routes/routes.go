@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/Hello256World/shop-api/middleware"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -21,6 +23,11 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	specificationHandler := NewSpecificationHandler(db)
 	compareProductHandler := NewCompareProductHandler(db)
 
+	versionOne(server, superAdminHandler, adminHandler, authHandler, usersHandler, categoryHandler, productHandler, cartHandler, cartProductHandler, orderHandler, addressHandler, imageProductHandler, specificationHandler, compareProductHandler)
+	versionTwo(server)
+}
+
+func versionOne(server *gin.Engine, superAdminHandler *SuperAdminHandler, adminHandler *AdminHandler, authHandler *AuthHandler, usersHandler *CustomerHandler, categoryHandler *CategoryHandler, productHandler *ProductHandler, cartHandler *CartHandler, cartProductHandler *CartProductHandler, orderHandler *OrderHandler, addressHandler *AddressHandler, imageProductHandler *ImageProductHandler, specificationHandler *SpecificationHandler, compareProductHandler *CompareProductHandler) {
 	mainGroup := server.Group("/v1")
 
 	publicGroup := mainGroup.Group("/public")
@@ -102,4 +109,11 @@ func RegisterRouter(server *gin.Engine, db *gorm.DB) {
 	subAdminGroup.POST("/products", productHandler.create)
 	subAdminGroup.PUT("/products/:productId", productHandler.update)
 	subAdminGroup.DELETE("/products/:productId", productHandler.delete)
+}
+
+func versionTwo(server *gin.Engine) {
+	mainGroup := server.Group("/v2")
+	mainGroup.GET("/restricted/orders", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusAccepted, gin.H{"message": "All Done"})
+	})
 }
