@@ -1,5 +1,3 @@
-// Package zarinpal provides simple methods to work
-// with Zarinpal (https://www.zarinpal.com/) checkout gateway
 package utils
 
 import (
