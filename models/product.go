@@ -10,7 +10,7 @@ import (
 type Product struct {
 	ID             uint64     `gorm:"primaryKey"`
 	Name           string     `gorm:"not null"`
-	Description    *string    `gorm:"column:description"`
+	Description    *string    `gorm:"column:description;null;type:text"`
 	Price          float64    `gorm:"not null;type:float"`
 	Stock          int        `gorm:"not null;type:int"`
 	Thumbnail      string     `gorm:"not null;type:varchar"`
@@ -135,8 +135,8 @@ func (p *ProductService) IsProductById(id uint64) bool {
 	return err == nil
 }
 
-func (p *ProductService) GetProductsById(ids ...uint64) (*[]Product,error){
+func (p *ProductService) GetProductsById(ids ...uint64) (*[]Product, error) {
 	var products []Product
-	err := p.repo.GetQuery().Where("id IN ?",ids).Find(&products).Error
-	return &products,err
+	err := p.repo.GetQuery().Where("id IN ?", ids).Find(&products).Error
+	return &products, err
 }

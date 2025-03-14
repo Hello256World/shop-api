@@ -25,7 +25,7 @@ func NewGenericRepository[T any](db *gorm.DB) *GenericRepository[T] {
 }
 
 func (r *GenericRepository[T]) GetQuery() *gorm.DB {
-	return r.db.Model(new(T))
+	return r.db
 }
 
 func (r *GenericRepository[T]) Create(entity *T) error {

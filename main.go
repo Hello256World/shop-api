@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	initializers.LoadEnvVariable()
+	initializers.LoadEnvVariables()
 	database.Init()
 	migrate.Init()
 }

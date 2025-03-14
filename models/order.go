@@ -12,10 +12,11 @@ import (
 type OrderStatus string
 
 const (
-	StatusConfirmed     OrderStatus = "confirmed"
-	StatusWaitingForIPG OrderStatus = "waiting_for_ipg"
-	StatusRejected      OrderStatus = "rejected"
-	StatusNew           OrderStatus = "new"
+	OrderStatusConfirmed     OrderStatus = "confirmed"
+	OrderStatusWaitingForIPG OrderStatus = "waiting_for_ipg"
+	OrderStatusRejected      OrderStatus = "rejected"
+	OrderStatusFailed        OrderStatus = "failed"
+	OrderStatusNew           OrderStatus = "new"
 )
 
 func (s *OrderStatus) Scan(value interface{}) error {
@@ -41,7 +42,7 @@ func (s OrderStatus) Value() (driver.Value, error) {
 
 func (s OrderStatus) isValid() bool {
 	switch s {
-	case StatusConfirmed, StatusWaitingForIPG, StatusRejected, StatusNew:
+	case OrderStatusConfirmed, OrderStatusFailed, OrderStatusRejected, OrderStatusNew, OrderStatusWaitingForIPG:
 		return true
 	default:
 		return false
@@ -52,9 +53,10 @@ type Order struct {
 	ID              uint64 `gorm:"primaryKey"`
 	CustomerID      uint64 `gorm:"not null"`
 	AddressID       uint64 `gorm:"not null"`
+	TransactionID   uint64 `gorm:"null"`
 	CustomerName    string `gorm:"not null"`
 	Phone           string `gorm:"not null"`
-	Description     *string
+	Description     *string `gorm:"null;type:text"`
 	Weight          float64 `gorm:"not null"`
 	DeliverMethod   string  `gorm:"not null"`
 	RejectionReason *string

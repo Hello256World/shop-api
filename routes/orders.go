@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -102,8 +103,8 @@ func (o *OrderHandler) update(c *gin.Context) {
 		return
 	}
 
-	if inputOrder.Status == models.StatusRejected {
-		if order.Status == models.StatusConfirmed {
+	if inputOrder.Status == models.OrderStatusRejected {
+		if order.Status == models.OrderStatusConfirmed {
 			c.JSON(http.StatusNotAcceptable, gin.H{"message": "سفارش تایید شده است و نمی توان آن را رد کرد"})
 			return
 		} else if inputOrder.RejectionReason == nil {
@@ -142,7 +143,7 @@ func (o *OrderHandler) getByCustomer(c *gin.Context) {
 		}
 	}
 	status := c.Query("status")
-	var finalstate models.OrderStatus 
+	var finalstate models.OrderStatus
 	if status != "" {
 		finalstate = models.OrderStatus(status)
 	}
@@ -198,28 +199,20 @@ func (o *OrderHandler) create(c *gin.Context) {
 	}
 
 	cart, err := o.cartService.GetByCustomerId(customerId)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت محصولات سبد خرید"})
-		return
-	} else if len(cart.CartProducts) == 0 {
+	if err != nil || len(cart.CartProducts) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "سبد خرید شما خالی می باشد"})
 		return
 	}
 
 	var productsId []uint64
 	var productsMap = make(map[int]int)
-
 	for _, val := range cart.CartProducts {
 		productsMap[int(val.ProductID)] = val.Quantity
 		productsId = append(productsId, val.ProductID)
 	}
 
-	var weight float64
-	var totalAmount float64
-
+	var weight, totalAmount float64
 	products, err := o.productService.GetProductsById(productsId...)
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در دریافت محصولات سبد خرید"})
 		return
@@ -227,32 +220,55 @@ func (o *OrderHandler) create(c *gin.Context) {
 
 	for _, val := range *products {
 		weight += val.ShipmentWeight * float64(productsMap[int(val.ID)])
-		totalAmount += val.Price
+		totalAmount += val.Price * float64(productsMap[int(val.ID)])
+	}
+
+	userAgent := c.Request.UserAgent()
+
+	// var deviceType string
+
+	// if strings.Contains(userAgent, "Mobile") || strings.Contains(userAgent, "Android") || strings.Contains(userAgent, "iPhone") {
+	// 	deviceType = "mobile"
+	// } else {
+	// 	deviceType = "browser"
+	// }
+
+	tx := o.orderService.BeginTransaction()
+	defer tx.Rollback()
+
+	transaction := models.Transaction{
+		CustomerID: customerId,
+		Type:       "default",
+		Device:     userAgent,
+		Status:     models.TransactionStatusNew,
+		Amount:     totalAmount,
+	}
+
+	if err := tx.Create(&transaction).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت تراکنش"})
+		return
 	}
 
 	customerOrder := models.Order{
 		AddressID:       address.ID,
 		CustomerID:      customerId,
+		TransactionID:   transaction.ID,
 		CustomerName:    address.ReceiverName,
 		Phone:           address.Phone,
 		Description:     inputOrder.Description,
 		DeliverMethod:   "post",
 		DeliveryAddress: address.Address,
-		Status:          models.StatusWaitingForIPG,
+		Status:          models.OrderStatusWaitingForIPG,
 		Weight:          weight,
 		TotalAmount:     totalAmount,
 	}
 
-	tx := o.orderService.BeginTransaction()
-	defer tx.Rollback()
-
 	if err := tx.Create(&customerOrder).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت سفارش"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت سفارش", "error": err.Error()})
 		return
 	}
 
 	var orderProducts []models.OrderProduct
-
 	for _, val := range cart.CartProducts {
 		var price float64
 		for _, value := range *products {
@@ -260,18 +276,61 @@ func (o *OrderHandler) create(c *gin.Context) {
 				price = value.Price
 			}
 		}
-		orderProduct := models.OrderProduct{
+		orderProducts = append(orderProducts, models.OrderProduct{
 			OrderID:   customerOrder.ID,
 			Quantity:  val.Quantity,
 			ProductID: val.ProductID,
 			Price:     price,
+		})
+	}
+
+	zarinPay, err := utils.NewZarinpal(os.Getenv("MERCHANT_ID"), true)
+	if err != nil {
+		transaction.Status = models.TransactionStatusFailed
+		customerOrder.Status = models.OrderStatusFailed
+		if err := tx.Save(&transaction).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی وضعیت تراکنش", "error": err.Error()})
+			return
+		}
+		if err := tx.Save(&customerOrder).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی وضعیت سفارش", "error": err.Error()})
+			return
+		}
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در کامیت تراکنش", "error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"message": "بخش اول : خطا در ایجاد درگاه پرداخت", "error": err.Error()})
+		return
+	}
+
+	paymentURL, authority, statusCode, err := zarinPay.NewPaymentRequest(int(totalAmount), "http://localhost:8080", "Test", "Desc", "Text@test.com")
+	if err != nil {
+		transaction.Status = models.TransactionStatusFailed
+		customerOrder.Status = models.OrderStatusFailed
+		if err := tx.Save(&transaction).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی وضعیت تراکنش", "error": err.Error()})
+			return
+		}
+		if err := tx.Save(&customerOrder).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی وضعیت سفارش", "error": err.Error()})
+			return
+		}
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در کامیت تراکنش", "error": err.Error()})
+			return
 		}
 
-		orderProducts = append(orderProducts, orderProduct)
+		if statusCode == -3 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "مبلغ کل برای سیستم بانکی قابل قبول نیست"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"message": "بخش دوم : خطا در ایجاد درگاه پرداخت", "error": err.Error()})
+		return
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در ساخت سفارش"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در کامیت تراکنش", "error": err.Error()})
 		return
 	}
 
@@ -285,7 +344,7 @@ func (o *OrderHandler) create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "سفارش با موفقیت ثبت شد", "URL": "https://hello.com"})
+	c.JSON(http.StatusCreated, gin.H{"message": "سفارش با موفقیت ثبت شد", "URL": paymentURL, "authority": authority})
 }
 
 func (o *OrderHandler) customerUpdate(c *gin.Context) {
@@ -307,5 +366,4 @@ func (o *OrderHandler) customerUpdate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "عملیات نا معتبر است"})
 		return
 	}
-
 }
