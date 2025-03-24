@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Hello256World/shop-api/models"
@@ -228,20 +229,26 @@ func (p *ProductHandler) update(c *gin.Context) {
 		return
 	}
 
+	var wg sync.WaitGroup
+
 	if inputProduct.Thumbnail != nil {
+		oldThumbnail := product.Thumbnail
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			imageIndex := strings.Index(oldThumbnail, "productsimage")
+			if imageIndex != -1 {
+				utils.DeleteImageOfServer("productsimage", oldThumbnail[imageIndex:])
+			}
+		}()
+
 		imageLocation, err := utils.AddImageToServer(c, "productsimage", "thumbnail", inputProduct.Thumbnail)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 			return
 		}
-
-		imageIndex := strings.Index(product.Thumbnail, "productsimage")
-		go func() {
-			if imageIndex != -1 {
-				utils.DeleteImageOfServer("productsimage", product.Thumbnail[imageIndex:])
-			}
-		}()
 
 		product.Thumbnail = *imageLocation
 	}
@@ -260,6 +267,8 @@ func (p *ProductHandler) update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی محصول"})
 		return
 	}
+
+	wg.Wait()
 
 	c.JSON(http.StatusCreated, gin.H{"message": "محصول با موفقیت بروزرسانی شد"})
 }
