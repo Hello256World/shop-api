@@ -30,7 +30,7 @@ type Transaction struct {
 	CustomerID               uint64            `gorm:"not null"`
 	Device                   string            `gorm:"not null"`
 	Type                     string            `gorm:"not null"`
-	Status                   TransactionStatus `gorm:"not null"`
+	Status                   TransactionStatus `gorm:"type:transaction_status;not null"`
 	RetrievalReferenceNumber *string           `gorm:"null;unique"`
 	FailureCause             *string           `gorm:"null"`
 	Amount                   float64           `gorm:"not null"`
@@ -48,12 +48,16 @@ type TransactionService struct {
 	repo repository.Repository[Transaction]
 }
 
-func NewTransactionService(db *gorm.DB) *TransactionService{
+func NewTransactionService(db *gorm.DB) *TransactionService {
 	return &TransactionService{
 		repo: repository.NewGenericRepository[Transaction](db),
 	}
 }
 
-func (t *TransactionService) BeginTransaction() *gorm.DB{
-	return t.repo.GetQuery().Begin()
+func (t *TransactionService) GetById(id uint64) (*Transaction, error) {
+	return t.repo.GetByID(id)
+}
+
+func (t *TransactionService) Update(entity *Transaction) error {
+	return t.repo.Update(entity)
 }

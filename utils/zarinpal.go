@@ -22,28 +22,38 @@ type Zarinpal struct {
 }
 
 type paymentRequestReqBody struct {
-	MerchantID  string
-	Amount      int
-	CallbackURL string
-	Description string
-	Email       string
-	Mobile      string
+	MerchantID  string `json:"merchant_id"`
+	Amount      int    `json:"amount"`
+	CallbackURL string `json:"callback_url"`
+	Description string `json:"description"`
+	Email       string `json:"email"`
+	Mobile      string `json:"mobile"`
 }
 
 type paymentRequestResp struct {
-	Status    int
-	Authority string
+	Data struct {
+		Status    int    `json:"code"`
+		Authority string `json:"authority"`
+	} `json:"data"`
 }
 
 type paymentVerificationReqBody struct {
-	MerchantID string
-	Authority  string
-	Amount     int
+	MerchantID string `json:"merchant_id"`
+	Authority  string `json:"authority"`
+	Amount     int    `json:"amount"`
 }
 
 type paymentVerificationResp struct {
-	Status int
-	RefID  json.Number
+	Data struct {
+		StatusCode int    `json:"code"`
+		Message    string `json:"message"`
+		CardHash   string `json:"card_hash"`
+		CardPan    string `json:"card_pan"`
+		RefID      int    `json:"ref_id"`
+		FeeType    string `json:"fee_type"`
+		Fee        int    `json:"fee"`
+	} `json:"data"`
+	Errors []any
 }
 
 type unverifiedTransactionsReqBody struct {
@@ -86,7 +96,7 @@ func NewZarinpal(merchantID string, sandbox bool) (*Zarinpal, error) {
 	}
 	apiEndPoint := "https://payment.zarinpal.com/pg/v4/payment/"
 	paymentEndpoint := "https://payment.zarinpal.com/pg/StartPay/"
-	if sandbox == true {
+	if sandbox {
 		apiEndPoint = "https://sandbox.zarinpal.com/pg/v4/payment/"
 		paymentEndpoint = "https://sandbox.zarinpal.com/pg/StartPay/"
 	}
@@ -134,12 +144,12 @@ func (zarinpal *Zarinpal) NewPaymentRequest(amount int, callbackURL, description
 	if err != nil {
 		return
 	}
-	statusCode = resp.Status
-	if resp.Status == 100 {
-		authority = resp.Authority
-		paymentURL = zarinpal.PaymentEndpoint + resp.Authority
+	statusCode = resp.Data.Status
+	if resp.Data.Status == 100 {
+		authority = resp.Data.Authority
+		paymentURL = zarinpal.PaymentEndpoint + resp.Data.Authority
 	} else {
-		err = errors.New(strconv.Itoa(resp.Status))
+		err = errors.New(strconv.Itoa(resp.Data.Status))
 	}
 	return
 }
@@ -168,16 +178,16 @@ func (zarinpal *Zarinpal) PaymentVerification(amount int, authority string) (ver
 		Authority:  authority,
 	}
 	var resp paymentVerificationResp
-	err = zarinpal.request("PaymentVerification.json", &paymentVerification, &resp)
+	err = zarinpal.request("verify.json", &paymentVerification, &resp)
 	if err != nil {
 		return
 	}
-	statusCode = resp.Status
-	if resp.Status == 100 {
+	statusCode = resp.Data.StatusCode
+	if resp.Data.StatusCode == 100 {
 		verified = true
-		refID = string(resp.RefID)
+		refID = string(resp.Data.RefID)
 	} else {
-		err = errors.New(strconv.Itoa(resp.Status))
+		err = errors.New(strconv.Itoa(resp.Data.StatusCode))
 	}
 	return
 }
@@ -260,6 +270,7 @@ func (zarinpal *Zarinpal) request(method string, data interface{}, res interface
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {

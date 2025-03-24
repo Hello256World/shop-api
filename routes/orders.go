@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Hello256World/shop-api/models"
@@ -19,6 +21,7 @@ type OrderHandler struct {
 	productService      *models.ProductService
 	orderProductService *models.OrderProductService
 	cartProductService  *models.CartProductService
+	transactionService  *models.TransactionService
 }
 
 func NewOrderHandler(db *gorm.DB) *OrderHandler {
@@ -29,6 +32,7 @@ func NewOrderHandler(db *gorm.DB) *OrderHandler {
 		productService:      models.NewProductService(db),
 		orderProductService: models.NewOrderProductService(db),
 		cartProductService:  models.NewCartProductService(db),
+		transactionService:  models.NewTransactionService(db),
 	}
 }
 
@@ -225,13 +229,13 @@ func (o *OrderHandler) create(c *gin.Context) {
 
 	userAgent := c.Request.UserAgent()
 
-	// var deviceType string
+	var deviceType string
 
-	// if strings.Contains(userAgent, "Mobile") || strings.Contains(userAgent, "Android") || strings.Contains(userAgent, "iPhone") {
-	// 	deviceType = "mobile"
-	// } else {
-	// 	deviceType = "browser"
-	// }
+	if strings.Contains(userAgent, "Mobile") || strings.Contains(userAgent, "Android") || strings.Contains(userAgent, "iPhone") {
+		deviceType = "mobile"
+	} else {
+		deviceType = "browser"
+	}
 
 	tx := o.orderService.BeginTransaction()
 	defer tx.Rollback()
@@ -239,7 +243,7 @@ func (o *OrderHandler) create(c *gin.Context) {
 	transaction := models.Transaction{
 		CustomerID: customerId,
 		Type:       "default",
-		Device:     userAgent,
+		Device:     deviceType,
 		Status:     models.TransactionStatusNew,
 		Amount:     totalAmount,
 	}
@@ -285,6 +289,7 @@ func (o *OrderHandler) create(c *gin.Context) {
 	}
 
 	zarinPay, err := utils.NewZarinpal(os.Getenv("MERCHANT_ID"), true)
+
 	if err != nil {
 		transaction.Status = models.TransactionStatusFailed
 		customerOrder.Status = models.OrderStatusFailed
@@ -304,7 +309,7 @@ func (o *OrderHandler) create(c *gin.Context) {
 		return
 	}
 
-	paymentURL, authority, statusCode, err := zarinPay.NewPaymentRequest(int(totalAmount), "http://localhost:8080", "Test", "Desc", "Text@test.com")
+	paymentURL, authority, statusCode, err := zarinPay.NewPaymentRequest(2000000000, fmt.Sprintf("http://localhost:8080/v1/public/orders/%v", customerOrder.ID), "test", "test@test.com", "09900994735")
 	if err != nil {
 		transaction.Status = models.TransactionStatusFailed
 		customerOrder.Status = models.OrderStatusFailed
@@ -347,7 +352,7 @@ func (o *OrderHandler) create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "سفارش با موفقیت ثبت شد", "URL": paymentURL, "authority": authority})
 }
 
-func (o *OrderHandler) customerUpdate(c *gin.Context) {
+func (o *OrderHandler) paymentUpdate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 
 	if err != nil {
@@ -362,8 +367,128 @@ func (o *OrderHandler) customerUpdate(c *gin.Context) {
 		return
 	}
 
-	if order.CustomerID != c.GetUint64("customerId") {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "عملیات نا معتبر است"})
+	transaction, err := o.transactionService.GetById(order.TransactionID)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+
+	var inputOrder struct {
+		Authority string `form:"authority" binding:"required"`
+		Status    string `form:"status" binding:"required"`
+	}
+
+	if err := c.ShouldBind(&inputOrder); err != nil {
+		getErrors := utils.FormValidation(err.Error(), map[string]string{"Authority": "شناسه پرداخت"})
+		c.JSON(http.StatusBadRequest, gin.H{"message": getErrors})
+		return
+	}
+
+	zarinPay, err := utils.NewZarinpal(os.Getenv("MERCHANT_ID"), true)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در اطلاعات درگاه پرداخت", "error": err.Error()})
+		return
+	}
+
+	verified, refID, statusCode, err := zarinPay.PaymentVerification(2000000000, inputOrder.Authority)
+	if err != nil {
+		if statusCode == 101 {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "این پرداخت از قبل تایید شده است"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("status code is : %v", statusCode), "error": err.Error()})
+		return
+	}
+
+	if verified {
+		order.Status = models.OrderStatusNew
+		transaction.Status = models.TransactionStatusSucceed
+
+		if err := o.orderService.Update(order); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی سفارش", "error": err.Error()})
+			return
+		}
+
+		if err := o.transactionService.Update(transaction); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی تراکنش", "error": err.Error()})
+			return
+		}
+	} else {
+		order.Status = models.OrderStatusFailed
+		transaction.Status = models.TransactionStatusFailed
+
+		if err := o.orderService.Update(order); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی سفارش", "error": err.Error()})
+			return
+		}
+
+		if err := o.transactionService.Update(transaction); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": "خطا در بروزرسانی تراکنش", "error": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"message": fmt.Sprintf("پرداخت شما تایید شد/نشد : %v", verified), "refID": refID})
+}
+
+func (o *OrderHandler) callBackUrl(c *gin.Context) {
+	id := c.Param("id")
+
+	authority := c.Query("Authority")
+	status := c.Query("Status")
+
+	html := `
+		<!DOCTYPE html>
+		<html lang="fa">
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<title>صفحه دکمه</title>
+			<script>
+				window.onload = function() {
+					const id = '` + id + `';
+					const authority = '` + authority + `';
+					const status = '` + status + `';
+
+					const body = JSON.stringify({
+						authority: authority,
+						status: status
+					});
+
+					fetch('/v1/public/orders/' + id, {
+						method: 'PUT',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: body
+					})
+					.then(response => response.text())
+					.then(data => console.log(data))
+					.catch(error => console.error('Error:', error));
+				};
+			</script>
+			<style>
+				body {
+					display: flex;
+					justify-content: center;
+					align-items: center;
+					height: 100vh;
+					background-color: #f0f0f0;
+				}
+				button {
+					padding: 10px 20px;
+					font-size: 16px;
+				}
+			</style>
+		</head>
+		<body>
+			<button onclick="alert('دکمه کلیک شد!')">کلیک کن!</button>
+		</body>
+		</html>
+		`
+
+	c.Header("Content-Type", "text/html")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }

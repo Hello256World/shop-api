@@ -39,6 +39,8 @@ func versionOne(server *gin.Engine, superAdminHandler *SuperAdminHandler, adminH
 	publicGroup.GET("/customers", usersHandler.getMe)
 	publicGroup.GET("/categories", categoryHandler.getAllActive)
 	publicGroup.GET("/products", productHandler.getAllActive)
+	publicGroup.PUT("/orders/:id", orderHandler.paymentUpdate)
+	publicGroup.GET("/orders/:id",orderHandler.callBackUrl)
 
 	restrictedGroup := mainGroup.Group("/restricted")
 	restrictedGroup.Use(middleware.CustomerAccess)
@@ -54,7 +56,6 @@ func versionOne(server *gin.Engine, superAdminHandler *SuperAdminHandler, adminH
 	// Restericted : Orders
 	restrictedGroup.GET("/orders", orderHandler.getByCustomer)
 	restrictedGroup.POST("/orders", orderHandler.create)
-	restrictedGroup.PUT("/orders/:id", orderHandler.customerUpdate)
 
 	// Restericted : Addresses
 	restrictedGroup.GET("/addresses", addressHandler.getAllActive)

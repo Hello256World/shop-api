@@ -90,8 +90,9 @@ func (a *AuthHandler) otp(c *gin.Context) {
 		return
 	}
 
-	rand.NewSource(time.Now().UnixNano())
-	pass := rand.Intn(999999-111111) + 111111
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	
+	pass := r.Intn(999999-111111) + 111111
 
 	phoneKey := fmt.Sprintf("%v", customer.Phone)
 
